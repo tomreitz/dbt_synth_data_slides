@@ -354,3 +354,5 @@ with
 select * from synth_table
 ```
 
+[comment]: # (!!! data-auto-animate)
+
