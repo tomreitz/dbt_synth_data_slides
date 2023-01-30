@@ -1,0 +1,526 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>motivation</title>
+		<link rel="stylesheet" href="dist/reset.css">
+		<link rel="stylesheet" href="dist/reveal.css">
+<link rel="stylesheet" href="dist/theme/white.css" id="theme">
+		<!-- Theme used for syntax highlighted code -->
+<link rel="stylesheet" href="plugin/highlight/zenburn.min.css" id="highlight-theme"></head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+<section data-markdown  data-auto-animate><textarea data-template>
+[comment]: # (markdown: { smartypants: true })
+
+
+
+<code style="color:#0eb9a3;">dbt_synth_data</code><br />
+<small>a `dbt` package for creating synthetic data</small>
+
+<hr style="border-width:1px 0 0 0;" />
+
+<!-- <strong>Tom Reitz</strong> &nbsp; &nbsp;  -->
+<div style="font-size:26px; line-height:56px;">Data Engineering @ <img src="media/ea_logo.png" style="height:48px; width:auto; margin:0; padding:0 10px; vertical-align:middle;" /></div>
+
+
+
+</textarea></section>
+<section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+Two approaches for creating fake data
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+![disguise](https://media.giphy.com/media/1ziDTlTl9z9iwVK5QA/giphy.gif)
+
+de-identify real data &rarr; possibly "fuzz" some values
+
+<em>can be suscpetible to re-identification</em>  <!-- .element: class="fragment" data-fragment-index="2" -->
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+![sculpting](https://media.giphy.com/media/1BeG0fUaEQtVns1uKb/giphy.gif)
+
+start with nothing &rarr; synthesize data by describing it
+
+<em>safer, but more work</em>  <!-- .element: class="fragment" data-fragment-index="2" -->
+
+<div>&uarr; <code style="color:#0eb9a3;">dbt_synth_data</code> does this</div>  <!-- .element: class="fragment" data-fragment-index="3" -->
+
+
+
+</textarea></section>
+</section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### motivation
+
+Other tools ([Faker](https://faker.readthedocs.io/en/master/) for Python, [Mimesis](https://mimesis.name/en/master/) for Postgres) exist for creating synthetic data... why build another?
+
+* **cross-platform:** write the same code once,<br />run on Snowflake, Postgres, SQLite...
+* **performance:** creating 100B rows with Faker takes months, Snowflake can do it in ~1 hour
+
+
+</textarea></section>
+<section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### how it works
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+most SQL flavors can `generate()` rows:
+
+```sql
+-- Snowflake:
+select
+	row_number() over (order by 1) as rownum
+from table(generator( rowcount => 100 ));
+
+-- Postgres:
+select
+	s.rownum as rownum
+from generate_series( 1, 100 ) as s(rownum);
+```
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+produces...
+
+| rownum |
+|---|
+| 1 |
+| 2 |
+| 3 |
+| ⋮ |
+| 100 |
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+most SQL flavors can generate `random()` numbers:
+
+```sql
+-- Snowflake:
+select random();
+--> int between -BIGINT_MIN : +BIGINT_MAX
+select uniform(0::float, 1::float, random());
+--> float between 0.0 : 1.0
+
+-- Postgres
+select random();
+--> float between 0.0 : 1.0
+```
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+put these together to generate rows of randomness:
+
+```sql
+-- Snowflake:
+select
+	row_number() over (order by 1) as rownum,
+  uniform(0::float, 1::float, random()) as randval
+from table(generator( rowcount => 100 ));
+
+-- Postgres:
+select
+	s.idx as rownum,
+  random() as randval
+from generate_series( 1, {{rows}} ) as s(idx);
+```
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+produces...
+
+| rownum | randval |
+|---|---|
+| 1 | 0.01736233267 |
+| 2 | 0.8667546837 |
+| 3 | 0.4433875307 |
+| ⋮ | ⋮ |
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+other (non-uniform) distributions are possible too
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+normal distribution:
+
+``` sql
+-- Snowflake:
+select
+	row_number() over (order by 1) as rownum,
+  normal(1::float, 1::float, random()) as normal_randval
+  --     ^ mean    ^ stddev  ^ rand
+from table(generator( rowcount => 100 ));
+
+-- Postgres:
+select
+	s.idx as rownum,
+  ( ( 1.0 * sqrt(-2*log(random()))*sin(2*pi()*random()) ) + 1.0 ) as normal_randval
+  --  ^ stddev          ^ rand 1              ^ rand 2      ^ mean
+from generate_series( 1, {{rows}} ) as s(idx);
+```
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+exponential distribution:
+
+``` sql
+-- Snowflake:
+select
+	row_number() over (order by 1) as rownum,
+  -ln( abs ( uniform(0::float, 1::float, random()) ) ) * (1/1.0) as exp_randval
+  --         ^ uniform rand                                 ^ lambda
+from table(generator( rowcount => 100 ));
+```
+
+
+</textarea></section>
+</section>
+<section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+![come on](https://media.giphy.com/media/4ZrFRwHGl4HTELW801/giphy.gif)
+
+precise syntax varies by SQL flavor
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+![nodding](https://media.giphy.com/media/OF4PIvoHuO2ze/giphy.gif)
+
+dbt to the rescue
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+<b>dbt</b> (data build tool)
+* used extensively by EA's data engineering team,<br />and by data engineers generally
+* compiles and runs SQL
+* allows for abstraction, writing macros (functions) that produce SQL
+* abstract across different SQL flavors/engines
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+example:
+```sql
+{{ synth_distribution_continuous_normal(mean=0, stddev=1) }}
+```
+compiles to
+```
+normal(0.0::float, 1.0::float, random())
+-- when run on Snowflake
+
+(
+  (
+    1.0::float
+    * sqrt( -2 * log( random() ) )
+    * sin( 2 * pi() * random() ) 
+  ) + 0.0::float
+) -- when run on Postgres
+```
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+![normal distribution](media/continuous_normal.png)
+
+<small>(histogram with 1M values)</small>
+
+</textarea></section>
+</section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### Current approaches for creating fake data include
+* a Python CLI tool  <!-- .element: class="fragment" data-fragment-index="2" -->
+* constructs Ed-Fi JSON from flat files based on a YAML configuration  <!-- .element: class="fragment" data-fragment-index="3" -->
+* supports transformations like join, filter, distinct, group by, and more  <!-- .element: class="fragment" data-fragment-index="4" -->
+* a JSON template is rendered for each row of transformed data  <!-- .element: class="fragment" data-fragment-index="5" -->
+
+
+
+</textarea></section>
+<section data-markdown  data-auto-animate data-background-color="#007978"><textarea data-template>
+
+### <code style="color:#FFF;">earthmover</code> configuration
+```yaml  [|4-10|12-21|23-30]
+config:
+  output_dir: ./
+
+sources:
+  courses:
+    file: ./sources/Courses.csv
+    header_rows: 1
+  schools:
+    file: ./sources/Schools.csv
+    header_rows: 1
+
+transformations:
+  courses:
+    operations:
+      - operation: join
+        sources:
+          - $sources.courses
+          - $sources.schools
+        join_type: inner
+        left_key: school_id
+        right_key: school_id
+      ...
+
+destinations:
+  # a destination for each Ed-Fi resource and descriptor
+  schools.jsonl:
+    source: $sources.schools
+    template: ./templates/school.jsont
+  courses.jsonl:
+    source: $transformations.courses
+    template: ./templates/course.jsont
+```
+
+
+
+</textarea></section>
+<section data-markdown  data-background-color="#007978"><textarea data-template>
+
+### <code style="color:#FFF;">earthmover</code> template
+```json [|2|18-20]
+{
+  "courseCode": "{{course_code}}",
+  "identificationCodes": [
+    {
+      "courseIdentificationSystemDescriptor": "uri://ed-fi.org/CourseIdentificationSystemDescriptor#LEA course code",
+      "identificationCode": "{{course_code}}"
+    }
+  ],
+  "educationOrganizationReference": {
+    "educationOrganizationId": {{district_id}}
+  },
+  "academicSubjectDescriptor": "uri://ed-fi.org/AcademicSubjectDescriptor#{{academic_subject}}",
+  "courseDefinedByDescriptor": "uri://ed-fi.org/CourseDefinedByDescriptor#LEA",
+  "courseDescription": "{{course_name}}",
+  "courseGPAApplicabilityDescriptor": "uri://ed-fi.org/CourseGPAApplicabilityDescriptor#{{gpa_weight}}",
+  "courseTitle": "{{course_name}}",
+  "levelCharacteristics": [
+    {% if is_ap==1 %}
+    { ... }
+    {% endif %}
+  ],
+  "numberOfParts": 1
+  "offeredGradeLevels": [
+    ...
+  ]
+}
+```
+<small>JSON + Jinja templating languge</small>
+
+
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### <code style="color:#1c5ca7;">lightbeam</code>
+* also a Python CLI tool                            <!-- .element: class="fragment" data-fragment-index="2" -->
+* processes JSONL files                             <!-- .element: class="fragment" data-fragment-index="3" -->
+* validates JSON based on Ed-Fi API's Swagger docs  <!-- .element: class="fragment" data-fragment-index="4" -->
+* sends JSON to an Ed-Fi API in dependency-order    <!-- .element: class="fragment" data-fragment-index="5" -->
+
+
+
+</textarea></section>
+<section data-markdown  data-auto-animate data-background-color="#1c5ca7"><textarea data-template>
+
+### <code style="color:#FFF;">lightbeam</code> configuration
+```yaml  [|1|2-8|7-8|9-15]
+data_dir: ./
+edfi_api:
+  base_url: https://api.schooldistrict.org/v5.3/api
+  version: 3
+  mode: year_specific
+  year: 2021
+  client_id: ${EDFI_API_CLIENT_ID}
+  client_secret: ${EDFI_API_CLIENT_SECRET}
+connection:
+  pool_size: 8
+  timeout: 60
+  num_retries: 10
+  backoff_factor: 1.5
+  retry_statuses: [429, 500, 502, 503, 504]
+  verify_ssl: True
+``` 
+<!-- .element: class="fragment" data-fragment-index="2" -->
+
+
+
+</textarea></section>
+<section data-markdown  data-auto-animate data-background-color="#cbdc3f"><textarea data-template>
+
+Putting it all together
+
+```bash
+earthmover run -c path/to/config.yaml
+lightbeam validate+send -c path/to/config.yaml
+```
+<small>(requires external orchestration - CRON, Airflow, Dagster, etc.)</small>
+
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### Features
+* <code style="color:#007978;">earthmover</code> visualizes data lineage
+![media/dag.png](media/dag.png)
+
+</textarea></section>
+<section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### Features
+* selectors: process only some descriptors/resources
+  ```bash
+  earthmover run -c path/to/config.yaml -s courses,student*
+  lightbeam send -c path/to/config.yaml -s courses,student*
+  ```
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### Features
+* use environment variables or command-line parameters (which override env vars)
+  ```bash
+  earthmover run -c path/to/config.yaml -p '{\
+  "BASE_DIR":"path/to/base/dir"\
+  }'
+
+  lightbeam send -c path/to/config.yaml -p '{\
+  "CLIENT_ID":"populated",\
+  "CLIENT_SECRET":"populatedSecret"\
+  }'
+  ```
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### Features
+* <code style="color:#007978;">earthmover</code> source data quality expectations
+  ```yaml
+  # earthmover
+  sources:
+    schools:
+      file: ./sources/Schools.csv
+      header_rows: 1
+      expect:
+        - low_grade != ''
+        - high_grade != ''
+        - low_grade|int <= high_grade|int
+  ```
+  <small>(run fails if expectations not met)</small>
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### Features
+* <code style="color:#007978;">earthmover</code> state tracking: only re-process if source files change (based on file hash)
+  ```yaml
+  # earthmover
+  config:
+    state_file: ~/.earthmover.csv
+  ```
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+### Features
+* <code style="color:#1c5ca7;">lightbeam</code> state tracking: selectively resend payloads
+  ```yaml
+  # lightbeam
+  state_dir: ~/.lighbeam/
+  ```
+
+  ```bash
+  lightbeam send -c path/to/config.yaml --newer-than 2020-12-25T00:00:00
+  ```
+
+</textarea></section>
+<section data-markdown  ><textarea data-template>
+
+### Features
+* <code style="color:#007978;">earthmover</code> supports source files larger than memory (via dask)
+* tested with attendance data of 3GB+
+
+
+
+</textarea></section>
+</section>
+<section data-markdown  ><textarea data-template>
+
+<a href="https://github.com/edanalytics/earthmover" target="_blank" style="color:#007978;">earthmover</a> + <a href="https://github.com/edanalytics/lightbeam" target="_blank" style="color:#1c5ca7;">lightbeam</a> are public,<br />open-source GitHub repositories available<br />under the Apache 2.0 license.
+
+Extensive docs and examples are<br />available at the project repos.
+
+</textarea></section>
+<section data-markdown  ><textarea data-template>
+
+We've also translated ~20 existing Data Import Tool mappings for assessment data into reusable <a href="https://github.com/edanalytics/earthmover_edfi_bundles" target="_blank">earthmover Ed-Fi bundles</a> which will be open-sourced soon.
+
+![media/earthmover-assessment-bundles.png](media/earthmover-assessment-bundles.png)
+
+
+
+</textarea></section>
+<section data-markdown ><textarea data-template>
+
+### Conclusion
+
+* EA is already using <code style="color:#007978;">earthmover</code> + <code style="color:#1c5ca7;">lightbeam</code>
+* works nicely in data pipelines (Airflow, Dagster)
+* most of the work is building the JSON templates and YAML transformations
+* we're working with a partner to do custom mapping for flat data they have from a SIS they don't own
+* other use-cases include
+  - pre-populating Ed-Fi with custom descriptors
+  - converting data to Ed-Fi for analytics without needing an Ed-Fi API/ODS
+</textarea></section>
+			</div>
+		</div>
+
+		<script src="dist/reveal.js"></script>
+		<script src="plugin/notes/notes.js"></script>
+		<script src="plugin/markdown/markdown.js"></script>
+		<script src="plugin/highlight/highlight.js"></script>
+		<script src="plugin/math/math.js"></script>
+		<script>
+			// More info about initialization & config:
+			// - https://revealjs.com/initialization/
+			// - https://revealjs.com/config/
+Reveal.initialize({
+controls : false,
+markdown : {smartypants: true},
+controls : true,
+keyboard : true,
+hash : false,
+respondToHashChanges : false,
+				hash: true,
+				// Learn about plugins: https://revealjs.com/plugins/
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes, RevealMath ]
+			});
+		</script>
+	</body>
+</html>
