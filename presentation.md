@@ -215,3 +215,4 @@ normal(0.0::float, 1.0::float, random())
 
 [comment]: # (!!! data-auto-animate)
 
+how it works
