@@ -64,7 +64,7 @@ start with nothing &rarr; synthesize data by describing it
 
 Other tools ([Faker](https://faker.readthedocs.io/en/master/) for Python, [Mimesis](https://mimesis.name/en/master/) for Postgres) exist for creating synthetic data... why build another?
 
-* **cross-platform:** write the same code once,<br />run on Snowflake, Postgres, SQLite...
+* **cross-platform:** write code once, run on<br />Snowflake, Postgres, SQLite...
 * **performance:** creating 100B rows with Faker takes months, Snowflake can do it in ~1 hour
 
 
@@ -165,14 +165,14 @@ normal distribution:
 ``` sql
 -- Snowflake:
 select
-	row_number() over (order by 1) as rownum,
+  row_number() over (order by 1) as rownum,
   normal(1::float, 1::float, random()) as normal_randval
   --     ^ mean    ^ stddev  ^ rand
 from table(generator( rowcount => 100 ));
 
 -- Postgres:
 select
-	s.idx as rownum,
+  s.idx as rownum,
   ( ( 1.0 * sqrt(-2*log(random()))*sin(2*pi()*random()) ) + 1.0 ) as normal_randval
   --  ^ stddev          ^ rand 1              ^ rand 2      ^ mean
 from generate_series( 1, {{rows}} ) as s(idx);
@@ -246,258 +246,140 @@ normal(0.0::float, 1.0::float, random())
 
 <small>(histogram with 1M values)</small>
 
+
+
 </textarea></section>
 </section>
-<section data-markdown  data-auto-animate><textarea data-template>
-
-### Current approaches for creating fake data include
-* a Python CLI tool  <!-- .element: class="fragment" data-fragment-index="2" -->
-* constructs Ed-Fi JSON from flat files based on a YAML configuration  <!-- .element: class="fragment" data-fragment-index="3" -->
-* supports transformations like join, filter, distinct, group by, and more  <!-- .element: class="fragment" data-fragment-index="4" -->
-* a JSON template is rendered for each row of transformed data  <!-- .element: class="fragment" data-fragment-index="5" -->
-
-
-
-</textarea></section>
-<section data-markdown  data-auto-animate data-background-color="#007978"><textarea data-template>
-
-### <code style="color:#FFF;">earthmover</code> configuration
-```yaml  [|4-10|12-21|23-30]
-config:
-  output_dir: ./
-
-sources:
-  courses:
-    file: ./sources/Courses.csv
-    header_rows: 1
-  schools:
-    file: ./sources/Schools.csv
-    header_rows: 1
-
-transformations:
-  courses:
-    operations:
-      - operation: join
-        sources:
-          - $sources.courses
-          - $sources.schools
-        join_type: inner
-        left_key: school_id
-        right_key: school_id
-      ...
-
-destinations:
-  # a destination for each Ed-Fi resource and descriptor
-  schools.jsonl:
-    source: $sources.schools
-    template: ./templates/school.jsont
-  courses.jsonl:
-    source: $transformations.courses
-    template: ./templates/course.jsont
-```
-
-
-
-</textarea></section>
-<section data-markdown  data-background-color="#007978"><textarea data-template>
-
-### <code style="color:#FFF;">earthmover</code> template
-```json [|2|18-20]
-{
-  "courseCode": "{{course_code}}",
-  "identificationCodes": [
-    {
-      "courseIdentificationSystemDescriptor": "uri://ed-fi.org/CourseIdentificationSystemDescriptor#LEA course code",
-      "identificationCode": "{{course_code}}"
-    }
-  ],
-  "educationOrganizationReference": {
-    "educationOrganizationId": {{district_id}}
-  },
-  "academicSubjectDescriptor": "uri://ed-fi.org/AcademicSubjectDescriptor#{{academic_subject}}",
-  "courseDefinedByDescriptor": "uri://ed-fi.org/CourseDefinedByDescriptor#LEA",
-  "courseDescription": "{{course_name}}",
-  "courseGPAApplicabilityDescriptor": "uri://ed-fi.org/CourseGPAApplicabilityDescriptor#{{gpa_weight}}",
-  "courseTitle": "{{course_name}}",
-  "levelCharacteristics": [
-    {% if is_ap==1 %}
-    { ... }
-    {% endif %}
-  ],
-  "numberOfParts": 1
-  "offeredGradeLevels": [
-    ...
-  ]
-}
-```
-<small>JSON + Jinja templating languge</small>
-
-
-
-</textarea></section>
-<section data-markdown  data-auto-animate><textarea data-template>
-
-### <code style="color:#1c5ca7;">lightbeam</code>
-* also a Python CLI tool                            <!-- .element: class="fragment" data-fragment-index="2" -->
-* processes JSONL files                             <!-- .element: class="fragment" data-fragment-index="3" -->
-* validates JSON based on Ed-Fi API's Swagger docs  <!-- .element: class="fragment" data-fragment-index="4" -->
-* sends JSON to an Ed-Fi API in dependency-order    <!-- .element: class="fragment" data-fragment-index="5" -->
-
-
-
-</textarea></section>
-<section data-markdown  data-auto-animate data-background-color="#1c5ca7"><textarea data-template>
-
-### <code style="color:#FFF;">lightbeam</code> configuration
-```yaml  [|1|2-8|7-8|9-15]
-data_dir: ./
-edfi_api:
-  base_url: https://api.schooldistrict.org/v5.3/api
-  version: 3
-  mode: year_specific
-  year: 2021
-  client_id: ${EDFI_API_CLIENT_ID}
-  client_secret: ${EDFI_API_CLIENT_SECRET}
-connection:
-  pool_size: 8
-  timeout: 60
-  num_retries: 10
-  backoff_factor: 1.5
-  retry_statuses: [429, 500, 502, 503, 504]
-  verify_ssl: True
-``` 
-<!-- .element: class="fragment" data-fragment-index="2" -->
-
-
-
-</textarea></section>
-<section data-markdown  data-auto-animate data-background-color="#cbdc3f"><textarea data-template>
-
-Putting it all together
-
-```bash
-earthmover run -c path/to/config.yaml
-lightbeam validate+send -c path/to/config.yaml
-```
-<small>(requires external orchestration - CRON, Airflow, Dagster, etc.)</small>
-
-
-</textarea></section>
-<section data-markdown  data-auto-animate><textarea data-template>
-
-### Features
-* <code style="color:#007978;">earthmover</code> visualizes data lineage
-![media/dag.png](media/dag.png)
-
-</textarea></section>
 <section>
 <section data-markdown  data-auto-animate><textarea data-template>
 
-### Features
-* selectors: process only some descriptors/resources
-  ```bash
-  earthmover run -c path/to/config.yaml -s courses,student*
-  lightbeam send -c path/to/config.yaml -s courses,student*
-  ```
+<code style="color:#0eb9a3;">dbt_synth_data</code> uses CTEs<br />(common table expressions)<br />extensively to deal with two problems:
 
 </textarea></section>
 <section data-markdown  data-auto-animate><textarea data-template>
 
-### Features
-* use environment variables or command-line parameters (which override env vars)
-  ```bash
-  earthmover run -c path/to/config.yaml -p '{\
-  "BASE_DIR":"path/to/base/dir"\
-  }'
+![really?](https://media.giphy.com/media/Pn1gZzAY38kbm/giphy.gif)
 
-  lightbeam send -c path/to/config.yaml -p '{\
-  "CLIENT_ID":"populated",\
-  "CLIENT_SECRET":"populatedSecret"\
-  }'
-  ```
+**problem 1:** SQL engines "optimize away"<br />randomness inside subqueries
 
 </textarea></section>
 <section data-markdown  data-auto-animate><textarea data-template>
 
-### Features
-* <code style="color:#007978;">earthmover</code> source data quality expectations
-  ```yaml
-  # earthmover
-  sources:
-    schools:
-      file: ./sources/Schools.csv
-      header_rows: 1
-      expect:
-        - low_grade != ''
-        - high_grade != ''
-        - low_grade|int <= high_grade|int
-  ```
-  <small>(run fails if expectations not met)</small>
+```sql
+-- select a random district
+select
+  ceil(uniform(125::float, 175::float, random())) as rand_lea,
+  (
+    select k_lea
+    from db.schema.int_leas
+    where lea_id=ceil(uniform(125::float, 175::float, random()))
+    limit 1
+  ) as k_lea
+from table(generator( rowcount => 100 ));
+```
 
 </textarea></section>
 <section data-markdown  data-auto-animate><textarea data-template>
 
-### Features
-* <code style="color:#007978;">earthmover</code> state tracking: only re-process if source files change (based on file hash)
-  ```yaml
-  # earthmover
-  config:
-    state_file: ~/.earthmover.csv
-  ```
+produces
+
+| rand_lea | k_lea |
+|---|---|
+| 165 | f8de717cfb7ed59631852d1c7f63bc70 |
+| 156 | f8de717cfb7ed59631852d1c7f63bc70 |
+| 139 | f8de717cfb7ed59631852d1c7f63bc70 |
+| ⋮ | ⋮ |
+
+... oops!
 
 </textarea></section>
 <section data-markdown  data-auto-animate><textarea data-template>
 
-### Features
-* <code style="color:#1c5ca7;">lightbeam</code> state tracking: selectively resend payloads
-  ```yaml
-  # lightbeam
-  state_dir: ~/.lighbeam/
-  ```
-
-  ```bash
-  lightbeam send -c path/to/config.yaml --newer-than 2020-12-25T00:00:00
-  ```
+```sql [5-8]
+-- select a random district
+select
+  ceil(uniform(125::float, 175::float, random())) as rand_lea,
+  (
+    select k_lea
+    from db.schema.int_leas
+    where lea_id=ceil(uniform(125::float, 175::float, random()))
+    limit 1
+  ) as k_lea
+from table(generator( rowcount => 100 ));
+```
+inner subquery is run once,<br />result reused for every row of outer query!
 
 </textarea></section>
-<section data-markdown  ><textarea data-template>
+<section data-markdown  data-auto-animate><textarea data-template>
 
-### Features
-* <code style="color:#007978;">earthmover</code> supports source files larger than memory (via dask)
-* tested with attendance data of 3GB+
+CTEs fix this:
+```sql
+-- select a random district
+with leas as (
+  select k_lea, lea_id
+  from db.schema.int_leas
+),
+base as (
+  select
+    ceil(uniform(125::float, 175::float, random())) as rand_lea
+  from table(generator( rowcount => 100 ))
+)
+select base.*, leas.k_lea
+from base
+  join leas on base.rand_lea=leas.lea_id;
+```
 
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
 
+produces
+
+| rand_lea | k_lea |
+|---|---|
+| 174 | 23bd8cc78d10d8a3f6a9ec35caa38d33 |
+| 171 | 80ed1896bc0fed93d078ac5126181f3d |
+| 156 | 7b96ed1ecf4d0f6ff41ee65f698e7d69 |
+| ⋮ | ⋮ |
+
+... much better
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+**problem 2**: some SQL engines<br />don't suppoprt column reuse
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+```sql
+select
+  ceil(uniform(0::float, 10::float, random())) as randint,
+  5 * randint as multint
+from table(generator( rowcount => 100 ));
+-- works in Snowflake, but not Postgres :(
+```
+
+</textarea></section>
+<section data-markdown  data-auto-animate><textarea data-template>
+
+CTEs fix this:
+```sql
+with step1 as (
+  select
+    ceil(uniform(0::float, 10::float, random())) as randint
+  from table(generator( rowcount => 100 ));
+),
+step2 as (
+  select
+    randint,
+    5 * randint as multint
+  from step1
+)
+select * from step2
+```
 
 </textarea></section>
 </section>
-<section data-markdown  ><textarea data-template>
-
-<a href="https://github.com/edanalytics/earthmover" target="_blank" style="color:#007978;">earthmover</a> + <a href="https://github.com/edanalytics/lightbeam" target="_blank" style="color:#1c5ca7;">lightbeam</a> are public,<br />open-source GitHub repositories available<br />under the Apache 2.0 license.
-
-Extensive docs and examples are<br />available at the project repos.
-
-</textarea></section>
-<section data-markdown  ><textarea data-template>
-
-We've also translated ~20 existing Data Import Tool mappings for assessment data into reusable <a href="https://github.com/edanalytics/earthmover_edfi_bundles" target="_blank">earthmover Ed-Fi bundles</a> which will be open-sourced soon.
-
-![media/earthmover-assessment-bundles.png](media/earthmover-assessment-bundles.png)
-
-
-
-</textarea></section>
-<section data-markdown ><textarea data-template>
-
-### Conclusion
-
-* EA is already using <code style="color:#007978;">earthmover</code> + <code style="color:#1c5ca7;">lightbeam</code>
-* works nicely in data pipelines (Airflow, Dagster)
-* most of the work is building the JSON templates and YAML transformations
-* we're working with a partner to do custom mapping for flat data they have from a SIS they don't own
-* other use-cases include
-  - pre-populating Ed-Fi with custom descriptors
-  - converting data to Ed-Fi for analytics without needing an Ed-Fi API/ODS
-</textarea></section>
 			</div>
 		</div>
 
