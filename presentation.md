@@ -24,7 +24,7 @@ Two approaches for creating fake data
 
 ![disguise](https://media.giphy.com/media/1ziDTlTl9z9iwVK5QA/giphy.gif)
 
-de-identify real data &rarr; possibly "fuzz" some values
+de-identify real data, possibly "fuzz" some values
 
 <em>can be suscpetible to re-identification</em>  <!-- .element: class="fragment" data-fragment-index="2" -->
 
@@ -32,7 +32,7 @@ de-identify real data &rarr; possibly "fuzz" some values
 
 ![sculpting](https://media.giphy.com/media/1BeG0fUaEQtVns1uKb/giphy.gif)
 
-start with nothing &rarr; synthesize data by describing it
+start with nothing, synthesize data by describing it
 
 <em>safer, but more work</em>  <!-- .element: class="fragment" data-fragment-index="2" -->
 
@@ -56,7 +56,7 @@ Other tools ([Faker](https://faker.readthedocs.io/en/master/) for Python, [Mimes
 
 [comment]: # (||| data-auto-animate)
 
-most SQL flavors can `generate()` rows:
+💡 &nbsp; most SQL flavors can `generate()` rows:
 
 ```sql
 -- Snowflake:
@@ -84,7 +84,7 @@ produces...
 
 [comment]: # (||| data-auto-animate)
 
-most SQL flavors can generate `random()` numbers:
+💡 &nbsp; most SQL flavors can generate `random()` numbers:
 
 ```sql
 -- Snowflake:
@@ -100,7 +100,7 @@ select random();
 
 [comment]: # (||| data-auto-animate)
 
-put these together to generate rows of randomness:
+💡<sup>2</sup> &nbsp; put these together to generate rows of randomness:
 
 ```sql
 -- Snowflake:
@@ -175,11 +175,11 @@ precise syntax varies by SQL flavor
 
 ![nodding](https://media.giphy.com/media/OF4PIvoHuO2ze/giphy.gif)
 
-dbt to the rescue
+**dbt** to the rescue
 
 [comment]: # (||| data-auto-animate)
 
-<b>dbt</b> (data build tool)
+**dbt** (data build tool)
 * used extensively by EA's data engineering team,<br />and by data engineers generally
 * compiles and runs SQL
 * allows for abstraction, writing macros (functions) that produce SQL
@@ -219,7 +219,7 @@ normal(0.0::float, 1.0::float, random())
 
 [comment]: # (||| data-auto-animate)
 
-![really?](https://media.giphy.com/media/Pn1gZzAY38kbm/giphy.gif)
+![really?](https://media.giphy.com/media/Ci3nCVx952lfG/giphy.gif)
 
 **problem 1:** SQL engines "optimize away"<br />randomness inside subqueries
 
@@ -265,7 +265,7 @@ select
   ) as k_lea
 from table(generator( rowcount => 100 ));
 ```
-inner subquery is run once,<br />result reused for every row of outer query!
+optimizer runs inner subquery once,<br />result reused for every row of outer query!
 
 [comment]: # (||| data-auto-animate)
 
@@ -333,11 +333,16 @@ select * from step2
 
 [comment]: # (!!! data-auto-animate)
 
-<code style="color:#0eb9a3;">dbt_synth_data</code> puts all of this together, implementing cross-platform macros for many types of columns, and providing seed data for building synthetic data.
+<code style="color:#0eb9a3;">dbt_synth_data</code> puts all of this together:
+* implements cross-platform macros
+* provides many types of columns
+* provides seed data for names, cities, and more
 
 [comment]: # (||| data-auto-animate)
 
 example:
+
+<div style="font-size:75%;">
 
 ```sql
 with
@@ -347,12 +352,49 @@ with
 {{ synth_column_expression(name='full_name', expression="first_name || ' ' || last_name") }}
 {{ synth_column_expression(name='sort_name', expression="last_name || ', ' || first_name") }}
 {{ synth_column_date(name="birth_date", min='1938-01-01', max='1994-12-31') }}
-{{ synth_column_address(name='shipping_address', countries=['United States'], parts=['street_address', 'city', 'geo_region_abbr', 'postal_code']) }}
+{{ synth_column_address(name='shipping_address', countries=['United States'],
+  parts=['street_address', 'city', 'geo_region_abbr', 'postal_code']) }}
 {{ synth_column_phone_number(name='phone_number') }}
-{{ synth_table(rows=100) }}
-
+{{ synth_table(rows=100000) }}
 select * from synth_table
 ```
 
+(compiles into a list of CTEs that build up synthetic data)
+</div>
+
+[comment]: # (||| data-auto-animate)
+
+produces:
+
+<div style="font-size:33%;">
+
+| k_customer | first_name | last_name | full_name | sort_name | birth_date | shipping_address | phone_number |
+|---|---|---|---|---|---|---|---|
+| 1de0...059a | Lucio | Ferguson | Lucio Ferguson | Ferguson, Lucio | 1986-04-24 | 3474 Plenty Ordinary Dr., Bryan, WI 93117 | (293) 959-0612 |
+| d1be...ae12 | Lon | Cherry | Lon Cherry | Cherry, Lon | 1954-08-22 | 1752 Consumer Ln. #11, Columbus, SC 895 | (498) 173-0332 |
+| c33b...0ef5 | Laverne | Villa | Laverne Villa | Villa, Laverne | 1951-07-13 | PO Box 514, Fremont, CA 20052 | (462) 191-0042 |
+| 655a...79c9 | Carly | Ayala | Carly Ayala | Ayala, Carly | 1944-09-16 | 9684 Buildings Rd. #447, The Bronx, OR 81518 | (542) 746-0487 |
+| 237a...57c7 | Tamika | Morales | Tamika Morales | Morales, Tamika | 1993-12-04 | 8666 Beauty Blvd. No. 748, Plymouth, AR 90491 | (961) 212-0923 |
+| ⋮ | ⋮ | ⋮ | ⋮ | ⋮ | ⋮ | ⋮ | ⋮ |
+
+</div>
+
 [comment]: # (!!! data-auto-animate)
 
+<code style="color:#0eb9a3;">dbt_synth_data</code> provides many column types
+
+<div style="font-size:75%;">
+
+* **basic:** boolean, int, int_sequence, numeric, date, date_sequence, primary_key, string, value, expression, mapping, values
+* **statistical:** distribution, correlation
+* **referential:** foreign_key, lookup, select
+* **data:** word, words, firstname, lastname, language, country, geo_region, city
+* **composite:** address, phone_number
+
+see [docs](https://github.com/edanalytics/dbt_synth_data/#column-types) for full syntax and examples
+
+</div>
+
+[comment]: # (!!! data-auto-animate)
+
+building actual data
