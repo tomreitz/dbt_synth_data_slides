@@ -46,7 +46,7 @@ start with nothing &rarr; synthesize data by describing it
 
 Other tools ([Faker](https://faker.readthedocs.io/en/master/) for Python, [Mimesis](https://mimesis.name/en/master/) for Postgres) exist for creating synthetic data... why build another?
 
-* **cross-platform:** write the same code once,<br />run on Snowflake, Postgres, SQLite...
+* **cross-platform:** write code once, run on<br />Snowflake, Postgres, SQLite...
 * **performance:** creating 100B rows with Faker takes months, Snowflake can do it in ~1 hour
 
 
