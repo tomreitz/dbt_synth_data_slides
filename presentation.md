@@ -18,23 +18,31 @@
 
 [comment]: # (!!! data-auto-animate)
 
-Two approaches for creating fake data
+### Approach
+
+<br />
+
+Two main methods for creating fake data
 
 [comment]: # (||| data-auto-animate)
 
 ![disguise](https://media.giphy.com/media/1ziDTlTl9z9iwVK5QA/giphy.gif)
 
-de-identify real data, possibly "fuzz" some values
+de-identify real data
 
-<em>can be suscpetible to re-identification</em>  <!-- .element: class="fragment" data-fragment-index="2" -->
+possibly "fuzz" some values  <!-- .element: class="fragment" data-fragment-index="2" -->
+
+<em>⚠️ can be susceptible to re-identification</em>  <!-- .element: class="fragment" data-fragment-index="3" -->
 
 [comment]: # (||| data-auto-animate)
 
 ![sculpting](https://media.giphy.com/media/1BeG0fUaEQtVns1uKb/giphy.gif)
 
-start with nothing, synthesize data by describing it
+start with nothing
 
-<em>safer, but more work</em>  <!-- .element: class="fragment" data-fragment-index="2" -->
+synthesize data by describing it  <!-- .element: class="fragment" data-fragment-index="2" -->
+
+<em>👍 safer, but more work</em>  <!-- .element: class="fragment" data-fragment-index="3" -->
 
 <div>&uarr; <code style="color:#0eb9a3;">dbt_synth_data</code> does this</div>  <!-- .element: class="fragment" data-fragment-index="3" -->
 
@@ -47,7 +55,7 @@ start with nothing, synthesize data by describing it
 Other tools ([Faker](https://faker.readthedocs.io/en/master/) for Python, [Mimesis](https://mimesis.name/en/master/) for Postgres) exist for creating synthetic data... why build another?
 
 * **cross-platform:** write code once, run on<br />Snowflake, Postgres, SQLite...
-* **performance:** creating 100B rows with Faker takes months, Snowflake can do it in ~1 hour
+* **performance:** Faker: 10 min for 100K rows; Snowflake: 1.2 hrs for 10B rows
 
 
 [comment]: # (!!! data-auto-animate)
@@ -56,17 +64,17 @@ Other tools ([Faker](https://faker.readthedocs.io/en/master/) for Python, [Mimes
 
 [comment]: # (||| data-auto-animate)
 
-💡 &nbsp; most SQL flavors can `generate()` rows:
+💡 &nbsp; most SQL dialects can `generate()` rows:
 
 ```sql
 -- Snowflake:
 select
-	row_number() over (order by 1) as rownum
+  row_number() over (order by 1) as rownum
 from table(generator( rowcount => 100 ));
 
 -- Postgres:
 select
-	s.rownum as rownum
+  s.rownum as rownum
 from generate_series( 1, 100 ) as s(rownum);
 ```
 
@@ -84,7 +92,7 @@ produces...
 
 [comment]: # (||| data-auto-animate)
 
-💡 &nbsp; most SQL flavors can generate `random()` numbers:
+💡 &nbsp; most SQL dialects can generate `random()` numbers:
 
 ```sql
 -- Snowflake:
@@ -93,27 +101,27 @@ select random();
 select uniform(0::float, 1::float, random());
 --> float between 0.0 : 1.0
 
--- Postgres
+-- Postgres:
 select random();
 --> float between 0.0 : 1.0
 ```
 
 [comment]: # (||| data-auto-animate)
 
-💡<sup>2</sup> &nbsp; put these together to generate rows of randomness:
+💡<sup>2</sup> &nbsp; put together, generate rows of randomness:
 
 ```sql
 -- Snowflake:
 select
-	row_number() over (order by 1) as rownum,
+  row_number() over (order by 1) as rownum,
   uniform(0::float, 1::float, random()) as randval
-from table(generator( rowcount => 100 ));
+from table(generator( rowcount => 100 ))
 
 -- Postgres:
 select
-	s.idx as rownum,
+  s.idx as rownum,
   random() as randval
-from generate_series( 1, {{rows}} ) as s(idx);
+from generate_series( 1, 100 ) as s(idx)
 ```
 
 [comment]: # (||| data-auto-animate)
@@ -127,49 +135,23 @@ produces...
 | 3 | 0.4433875307 |
 | ⋮ | ⋮ |
 
-[comment]: # (||| data-auto-animate)
-
-other (non-uniform) distributions are possible too
+yay!
 
 [comment]: # (||| data-auto-animate)
 
-normal distribution:
+📍 (non-uniform distributions are possible too)
 
-``` sql
--- Snowflake:
-select
-  row_number() over (order by 1) as rownum,
-  normal(1::float, 1::float, random()) as normal_randval
-  --     ^ mean    ^ stddev  ^ rand
-from table(generator( rowcount => 100 ));
-
--- Postgres:
-select
-  s.idx as rownum,
-  ( ( 1.0 * sqrt(-2*log(random()))*sin(2*pi()*random()) ) + 1.0 ) as normal_randval
-  --  ^ stddev          ^ rand 1              ^ rand 2      ^ mean
-from generate_series( 1, {{rows}} ) as s(idx);
-```
-
-[comment]: # (||| data-auto-animate)
-
-exponential distribution:
-
-``` sql
--- Snowflake:
-select
-	row_number() over (order by 1) as rownum,
-  -ln( abs ( uniform(0::float, 1::float, random()) ) ) * (1/1.0) as exp_randval
-  --         ^ uniform rand                                 ^ lambda
-from table(generator( rowcount => 100 ));
-```
 
 
 [comment]: # (!!! data-auto-animate)
 
-![come on](https://media.giphy.com/media/4ZrFRwHGl4HTELW801/giphy.gif)
+### Challenges
 
-precise syntax varies by SQL flavor
+[comment]: # (||| data-auto-animate)
+
+precise syntax varies by SQL dialect
+
+![come on](https://media.giphy.com/media/4ZrFRwHGl4HTELW801/giphy.gif)
 
 [comment]: # (||| data-auto-animate)
 
@@ -182,126 +164,108 @@ precise syntax varies by SQL flavor
 **dbt** (data build tool)
 * used extensively by EA's data engineering team,<br />and by data engineers generally
 * compiles and runs SQL
-* allows for abstraction, writing macros (functions) that produce SQL
-* abstract across different SQL flavors/engines
+* write macros (functions) that produce SQL
+* abstract across different SQL dialects
 
 [comment]: # (||| data-auto-animate)
 
-example:
 ```sql
-{{ synth_distribution_continuous_normal(mean=0, stddev=1) }}
+{{ synth_distribution_continuous_uniform(min=0.0, max=10.0) }}
 ```
 compiles to
 ```
-normal(0.0::float, 1.0::float, random())
+uniform(0.0::float, 10.0::float, random())
 -- when run on Snowflake
 
-(
-  (
-    1.0::float
-    * sqrt( -2 * log( random() ) )
-    * sin( 2 * pi() * random() ) 
-  ) + 0.0::float
-) -- when run on Postgres
+(10.0 - 0.0) * random() ) + 0.0
+-- when run on Postgres
 ```
 
+
 [comment]: # (||| data-auto-animate)
-
-![normal distribution](media/continuous_normal.png)
-
-<small>(histogram with 1M values)</small>
-
-
-
-[comment]: # (!!! data-auto-animate)
 
 <code style="color:#0eb9a3;">dbt_synth_data</code> uses CTEs<br />(common table expressions)<br />extensively to deal with two problems:
 
 [comment]: # (||| data-auto-animate)
 
-![really?](https://media.giphy.com/media/Ci3nCVx952lfG/giphy.gif)
-
 **problem 1:** SQL engines "optimize away"<br />randomness inside subqueries
 
-[comment]: # (||| data-auto-animate)
-
-```sql
--- select a random district
-select
-  ceil(uniform(125::float, 175::float, random())) as rand_lea,
-  (
-    select k_lea
-    from db.schema.int_leas
-    where lea_id=ceil(uniform(125::float, 175::float, random()))
-    limit 1
-  ) as k_lea
-from table(generator( rowcount => 100 ));
-```
+![really?](https://media.giphy.com/media/Ci3nCVx952lfG/giphy.gif)
 
 [comment]: # (||| data-auto-animate)
 
-produces
-
-| rand_lea | k_lea |
-|---|---|
-| 165 | f8de717cfb7ed59631852d1c7f63bc70 |
-| 156 | f8de717cfb7ed59631852d1c7f63bc70 |
-| 139 | f8de717cfb7ed59631852d1c7f63bc70 |
-| ⋮ | ⋮ |
-
-... oops!
-
-[comment]: # (||| data-auto-animate)
+<div style="font-size:90%;">
 
 ```sql [5-8]
--- select a random district
+-- grab 100 random schools by id
 select
-  ceil(uniform(125::float, 175::float, random())) as rand_lea,
+  ceil(uniform(100::float, 500::float, random())) as rand_school_id,
   (
-    select k_lea
-    from db.schema.int_leas
-    where lea_id=ceil(uniform(125::float, 175::float, random()))
+    select k_school
+    from db.schema.dim_school
+    where school_id=ceil(uniform(100::float, 500::float, random()))
     limit 1
-  ) as k_lea
-from table(generator( rowcount => 100 ));
+  ) as k_school
+from table(generator( rowcount => 100 ))
 ```
+
+</div>
+
 optimizer runs inner subquery once,<br />result reused for every row of outer query!
 
 [comment]: # (||| data-auto-animate)
 
+produces...
+
+| rand_school_id | k_school |
+|---|---|
+| 165 | f8de717cfb7ed59631852d1c7f63bc70 |
+| 456 | f8de717cfb7ed59631852d1c7f63bc70 |
+| 339 | f8de717cfb7ed59631852d1c7f63bc70 |
+| ⋮ | ⋮ |
+
+oops!
+
+[comment]: # (||| data-auto-animate)
+
 CTEs fix this:
+
+<div style="font-size:90%;">
+
 ```sql
--- select a random district
-with leas as (
-  select k_lea, lea_id
-  from db.schema.int_leas
+-- grab 100 random schools by id
+with dim_school as (
+  select school_id, k_school
+  from db.schema.dim_school
 ),
 base as (
   select
-    ceil(uniform(125::float, 175::float, random())) as rand_lea
+    ceil(uniform(100::float, 500::float, random())) as rand_school_id
   from table(generator( rowcount => 100 ))
 )
-select base.*, leas.k_lea
+select base.*, dim_school.k_school
 from base
-  join leas on base.rand_lea=leas.lea_id;
+  join dim_school on base.rand_school_id=dim_school.school_id
 ```
 
+</div>
+
 [comment]: # (||| data-auto-animate)
 
-produces
+produces...
 
-| rand_lea | k_lea |
+| rand_school_id | k_school |
 |---|---|
-| 174 | 23bd8cc78d10d8a3f6a9ec35caa38d33 |
+| 474 | 23bd8cc78d10d8a3f6a9ec35caa38d33 |
 | 171 | 80ed1896bc0fed93d078ac5126181f3d |
-| 156 | 7b96ed1ecf4d0f6ff41ee65f698e7d69 |
+| 256 | 7b96ed1ecf4d0f6ff41ee65f698e7d69 |
 | ⋮ | ⋮ |
 
-... much better
+much better
 
 [comment]: # (||| data-auto-animate)
 
-**problem 2**: some SQL engines<br />don't suppoprt column reuse
+**problem 2**: *some* SQL dialects<br />don't suppoprt column reuse
 
 [comment]: # (||| data-auto-animate)
 
@@ -309,7 +273,7 @@ produces
 select
   ceil(uniform(0::float, 10::float, random())) as randint,
   5 * randint as multint
-from table(generator( rowcount => 100 ));
+from table(generator( rowcount => 100 ))
 -- works in Snowflake, but not Postgres :(
 ```
 
@@ -320,7 +284,7 @@ CTEs fix this:
 with step1 as (
   select
     ceil(uniform(0::float, 10::float, random())) as randint
-  from table(generator( rowcount => 100 ));
+  from table(generator( rowcount => 100 ))
 ),
 step2 as (
   select
@@ -333,14 +297,79 @@ select * from step2
 
 [comment]: # (!!! data-auto-animate)
 
+### Features
+
 <code style="color:#0eb9a3;">dbt_synth_data</code> puts all of this together:
 * implements cross-platform macros
+* can construct complex distributions
 * provides many types of columns
 * provides seed data for names, cities, and more
 
 [comment]: # (||| data-auto-animate)
 
-example:
+```
+{{ synth_distribution_continuous_normal(mean=0.0, stddev=1.0) }}
+```
+
+![normal distribution](media/continuous_normal.png)
+
+<small>(histogram with 1M values)</small>
+
+[comment]: # (||| data-auto-animate)
+
+```
+{{ synth_distribution_continuous_exponential(lambda=0.1) }}
+```
+
+![normal distribution](media/continuous_exponential.png)
+
+<small>(histogram with 1M values)</small>
+
+[comment]: # (||| data-auto-animate)
+
+```
+{{ synth_distribution_union(
+  synth_distribution_continuous_normal(mean=5.0, stddev=1.0),
+  synth_distribution_continuous_normal(mean=8.0, stddev=1.0),
+  weights=[1, 2]
+) }}
+```
+
+![normal distribution](media/continuous_bimodal.png)
+
+<small>(histogram with 1M values)</small>
+
+[comment]: # (||| data-auto-animate)
+
+```
+{{ synth_distribution_average(
+  synth_distribution_continuous_exponential(lambda=0.1),
+  synth_distribution_continuous_normal(mean=2.0, stddev=1.0),
+  weights=[1,4]
+) }}
+```
+
+![normal distribution](media/continuous_average_exponential_normal.png)
+
+<small>(histogram with 1M values)</small>
+
+[comment]: # (||| data-auto-animate)
+
+<code style="color:#0eb9a3;">dbt_synth_data</code> provides many column types
+
+<div style="font-size:75%;">
+
+* **basic:** boolean, int, int_sequence, numeric, date, date_sequence, primary_key, string, value, expression, mapping, values
+* **statistical:** distribution, correlation
+* **referential:** foreign_key, lookup, select
+* **data:** word, words, firstname, lastname, language, country, geo_region, city
+* **composite:** address, phone_number
+
+see [docs](https://github.com/edanalytics/dbt_synth_data/#column-types) for full syntax and examples
+
+[comment]: # (||| data-auto-animate)
+
+dim_customer:
 
 <div style="font-size:75%;">
 
@@ -364,7 +393,7 @@ select * from synth_table
 
 [comment]: # (||| data-auto-animate)
 
-produces:
+produces...
 
 <div style="font-size:33%;">
 
@@ -381,20 +410,44 @@ produces:
 
 [comment]: # (!!! data-auto-animate)
 
-<code style="color:#0eb9a3;">dbt_synth_data</code> provides many column types
+### performance
+
+[comment]: # (||| data-auto-animate)
+
+e-commerce store on xsmall Snowflake warehouse
 
 <div style="font-size:75%;">
 
-* **basic:** boolean, int, int_sequence, numeric, date, date_sequence, primary_key, string, value, expression, mapping, values
-* **statistical:** distribution, correlation
-* **referential:** foreign_key, lookup, select
-* **data:** word, words, firstname, lastname, language, country, geo_region, city
-* **composite:** address, phone_number
+| table | rows | cols | run time | data size |
+|---|---|---|---|---|
+| **customers** | 1M | 8 | ~20 secs | 53.0 MB |
+| **products** | 50k | 3 | ~20 secs | 2.4 MB |
+| **stores** | 20k | 5 cols | ~2 secs | 1.3 MB |
+| **orders** | 50M | 4 | ~2 hrs | 1.0 GB |
+| **inventory** | 100M | 4 | ~5.5 hrs | 2.5 GB |
 
-see [docs](https://github.com/edanalytics/dbt_synth_data/#column-types) for full syntax and examples
+</div>
+
+[comment]: # (||| data-auto-animate)
+
+various distributions on xsmall Snowflake warehouse
+
+<div style="font-size:75%;">
+
+| table | rows | cols | run time | data size |
+|---|---|---|---|---|
+| **distributions** | 10B | 15 | 81 min | 614.7 GB |
 
 </div>
 
 [comment]: # (!!! data-auto-animate)
 
-building actual data
+### usage
+
+<div style="font-size:75%;">
+
+we are using <code style="color:#0eb9a3;">dbt_synth_data</code> to build<br /><code style="color:#0eb9a3;">edu_edfi_source_synth</code>, synthetic education data<br />which can feed into Stadium/EDU and Podium
+
+(useful for demos, training, development)
+
+</div>
