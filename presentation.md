@@ -151,6 +151,20 @@ yay!
 
 precise syntax varies by SQL dialect
 
+```sql
+-- Snowflake:
+select
+  uniform(0::float, 1::float, random()) as randval
+from table(generator( rowcount => 100 ))
+
+-- Postgres:
+select
+  random() as randval
+from generate_series( 1, 100 ) as s(idx)
+```
+
+[comment]: # (||| data-auto-animate)
+
 ![come on](https://media.giphy.com/media/4ZrFRwHGl4HTELW801/giphy.gif)
 
 [comment]: # (||| data-auto-animate)
@@ -162,7 +176,7 @@ precise syntax varies by SQL dialect
 [comment]: # (||| data-auto-animate)
 
 **dbt** (data build tool)
-* used extensively by EA's data engineering team,<br />and by data engineers generally
+* used extensively by DE
 * compiles and runs SQL
 * write macros (functions) that produce SQL
 * abstract across different SQL dialects
@@ -265,9 +279,7 @@ much better
 
 [comment]: # (||| data-auto-animate)
 
-**problem 2**: *some* SQL dialects<br />don't suppoprt column reuse
-
-[comment]: # (||| data-auto-animate)
+**problem 2**: *some* SQL dialects<br />don't support column reuse
 
 ```sql
 select
@@ -301,9 +313,10 @@ select * from step2
 
 <code style="color:#0eb9a3;">dbt_synth_data</code> puts all of this together:
 * implements cross-platform macros
-* can construct complex distributions
+* construct complex distributions of randomness
 * provides many types of columns
 * provides seed data for names, cities, and more
+* builds up data using CTEs
 
 [comment]: # (||| data-auto-animate)
 
@@ -414,6 +427,18 @@ produces...
 
 [comment]: # (||| data-auto-animate)
 
+various distributions on xsmall Snowflake warehouse
+
+<div style="font-size:75%;">
+
+| table | rows | cols | run time | data size |
+|---|---|---|---|---|
+| **distributions** | 10B | 15 | 81 min | 614.7 GB |
+
+</div>
+
+[comment]: # (||| data-auto-animate)
+
 e-commerce store on xsmall Snowflake warehouse
 
 <div style="font-size:75%;">
@@ -425,18 +450,6 @@ e-commerce store on xsmall Snowflake warehouse
 | **stores** | 20k | 5 cols | ~2 secs | 1.3 MB |
 | **orders** | 50M | 4 | ~2 hrs | 1.0 GB |
 | **inventory** | 100M | 4 | ~5.5 hrs | 2.5 GB |
-
-</div>
-
-[comment]: # (||| data-auto-animate)
-
-various distributions on xsmall Snowflake warehouse
-
-<div style="font-size:75%;">
-
-| table | rows | cols | run time | data size |
-|---|---|---|---|---|
-| **distributions** | 10B | 15 | 81 min | 614.7 GB |
 
 </div>
 
