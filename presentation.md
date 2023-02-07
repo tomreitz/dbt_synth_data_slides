@@ -156,6 +156,7 @@ precise syntax varies by SQL dialect
 select
   uniform(0::float, 1::float, random()) as randval
 from table(generator( rowcount => 100 ))
+
 -- Postgres:
 select
   random() as randval
