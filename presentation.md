@@ -151,20 +151,6 @@ yay!
 
 precise syntax varies by SQL dialect
 
-```sql
--- Snowflake:
-select
-  uniform(0::float, 1::float, random()) as randval
-from table(generator( rowcount => 100 ))
-
--- Postgres:
-select
-  random() as randval
-from generate_series( 1, 100 ) as s(idx)
-```
-
-[comment]: # (||| data-auto-animate)
-
 ![come on](https://media.giphy.com/media/4ZrFRwHGl4HTELW801/giphy.gif)
 
 [comment]: # (||| data-auto-animate)
@@ -176,7 +162,7 @@ from generate_series( 1, 100 ) as s(idx)
 [comment]: # (||| data-auto-animate)
 
 **dbt** (data build tool)
-* used extensively by DE
+* used extensively by EA's data engineering team,<br />and by data engineers generally
 * compiles and runs SQL
 * write macros (functions) that produce SQL
 * abstract across different SQL dialects
@@ -279,7 +265,9 @@ much better
 
 [comment]: # (||| data-auto-animate)
 
-**problem 2**: *some* SQL dialects<br />don't support column reuse
+**problem 2**: *some* SQL dialects<br />don't suppoprt column reuse
+
+[comment]: # (||| data-auto-animate)
 
 ```sql
 select
@@ -313,10 +301,9 @@ select * from step2
 
 <code style="color:#0eb9a3;">dbt_synth_data</code> puts all of this together:
 * implements cross-platform macros
-* construct complex distributions of randomness
+* can construct complex distributions
 * provides many types of columns
 * provides seed data for names, cities, and more
-* builds up data using CTEs
 
 [comment]: # (||| data-auto-animate)
 
@@ -427,18 +414,6 @@ produces...
 
 [comment]: # (||| data-auto-animate)
 
-various distributions on xsmall Snowflake warehouse
-
-<div style="font-size:75%;">
-
-| table | rows | cols | run time | data size |
-|---|---|---|---|---|
-| **distributions** | 10B | 15 | 81 min | 614.7 GB |
-
-</div>
-
-[comment]: # (||| data-auto-animate)
-
 e-commerce store on xsmall Snowflake warehouse
 
 <div style="font-size:75%;">
@@ -453,14 +428,54 @@ e-commerce store on xsmall Snowflake warehouse
 
 </div>
 
+[comment]: # (||| data-auto-animate)
+
+various distributions on xsmall Snowflake warehouse
+
+<div style="font-size:75%;">
+
+| table | rows | cols | run time | data size |
+|---|---|---|---|---|
+| **distributions** | 10B | 15 | 81 min | 614.7 GB |
+
+</div>
+
 [comment]: # (!!! data-auto-animate)
 
 ### usage
 
 <div style="font-size:75%;">
 
-we are using <code style="color:#0eb9a3;">dbt_synth_data</code> to build<br /><code style="color:#0eb9a3;">edu_edfi_source_synth</code>, synthetic education data<br />which can feed into Stadium/EDU and Podium
+we are using <code style="color:#0eb9a3;">dbt_synth_data</code> to build<br /><code style="color:#0eb9a3;">edu_edfi_source_synth</code>: synthetic education data<br />which can feed into Stadium/EDU and Podium
 
 (useful for demos, training, development)
 
 </div>
+
+[comment]: # (||| data-auto-animate)
+
+
+![dependency graph](media/int_model_dependencies.png)
+
+<small>(<code style="color:#0eb9a3;">edu_edfi_source_synth</code> model dependency graph)</small>
+
+[comment]: # (||| data-auto-animate)
+
+
+![highlighted dependency graph](media/int_model_dependencies_highlighted.png)
+
+<small>We had to first create the universe of **Courses**, then **Course Offerings**, then **Sections**, so that their relationships mirror a realistic school system.</small>
+
+
+[comment]: # (||| data-auto-animate)
+
+
+![sample sections](media/sections_sample.png)
+
+<small>Here's an example query output from the synthetic Ed-fi warehouse!</small>
+
+
+[comment]: # (!!! data-auto-animate)
+
+### thank you
+Any Questions?
