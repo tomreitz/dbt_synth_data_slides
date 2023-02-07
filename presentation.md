@@ -459,8 +459,36 @@ e-commerce store on xsmall Snowflake warehouse
 
 <div style="font-size:75%;">
 
-we are using <code style="color:#0eb9a3;">dbt_synth_data</code> to build<br /><code style="color:#0eb9a3;">edu_edfi_source_synth</code>, synthetic education data<br />which can feed into Stadium/EDU and Podium
+we are using <code style="color:#0eb9a3;">dbt_synth_data</code> to build<br /><code style="color:#0eb9a3;">edu_edfi_source_synth</code>: synthetic education data<br />which can feed into Stadium/EDU and Podium
 
 (useful for demos, training, development)
 
 </div>
+
+[comment]: # (||| data-auto-animate)
+
+
+![dependency graph](media/int_model_dependencies.png)
+
+<small>(<code style="color:#0eb9a3;">edu_edfi_source_synth</code> model dependency graph)</small>
+
+[comment]: # (||| data-auto-animate)
+
+
+![highlighted dependency graph](media/int_model_dependencies_highlighted.png)
+
+<small>We had to first create the universe of **Courses**, then **Course Offerings**, then **Sections**, so that their relationships mirror a realistic school system.</small>
+
+
+[comment]: # (||| data-auto-animate)
+
+
+![sample sections](media/sections_sample.png)
+
+<small>Here's an example query output from the synthetic Ed-fi warehouse!</small>
+
+
+[comment]: # (!!! data-auto-animate)
+
+### thank you
+Any Questions?
